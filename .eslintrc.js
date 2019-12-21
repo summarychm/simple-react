@@ -45,6 +45,7 @@ module.exports = {
 		"object-curly-spacing": 0,
 		"no-param-reassign": 0,
 		"no-debugger": 0,
+		"import/no-unresolved": 0,
 		"react/sort-comp": 0,
 		"react/destructuring-assignment": 0,
 		"react/no-access-state-in-setstate": 0,
