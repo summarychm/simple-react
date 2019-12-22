@@ -79,28 +79,25 @@ class NativeUnit extends Unit {
 				const eventType = `${eventName}.${this._reactId}`;
 				//! 将事件委托到 document上,用_reactId作为命名空间
 				$(document).delegate(selector, eventType, eventHandle);
-				// $(document).on(`${eventName}.${this._reactId}`, `[data-reactid="${this._reactId}"]`, props[propKey]);
 			} else if (propKey === "style") {
 				let styleStr = "";
+
 				for (const [attr, value] of Object.entries(props[propKey])) {
 					// 将驼峰式命名改为"短横线隔开式"
 					styleStr += `${attr.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}:${value};`;
 				}
 				tagStart += ` style="${styleStr}"`;
 			} else if (propKey === "children") {
-				// 获取子节点的Html
-				const children = props.children || [];
+				const children = props[propKey]; // 获取子节点Element
 				childString = children
 					.map((ele, idx) => {
 						const childUnitInstance = createReactUnit(ele); // 获取子元素的Unit实例
-						if (childUnitInstance) {
-							childUnitInstance._mountIndex = idx; //! 子元素的挂载索引(在父节点中的索引)
-							//! 缓存子元素unit到父节点的_renderedChildrenUnits属性
-							this._renderedChildrenUnits.push(childUnitInstance);
-							// 返回children的Html
-							return childUnitInstance.getHtmlString(`${this._reactId}.${idx}`);
-						}
-						return "";
+						if (!childUnitInstance) return "";
+						childUnitInstance._mountIndex = idx; //! 子元素的挂载索引(在父节点中的索引)
+						//! 缓存子元素unit到父节点的_renderedChildrenUnits属性
+						this._renderedChildrenUnits.push(childUnitInstance);
+						// 返回children的Html
+						return childUnitInstance.getHtmlString(`${this._reactId}.${idx}`);
 					})
 					.join("");
 			} else if (propKey === "htmlFor") tagStart += ` for=${props[propKey]}`;
@@ -120,7 +117,7 @@ class NativeUnit extends Unit {
 		const oldProps = this._currentElement.props; // 旧props
 		const newProps = nextElement.props; // 新props
 
-		this._currentElement = nextElement; // 更新虚拟DOM
+		// this._currentElement = nextElement; // 更新虚拟DOM
 
 		this._updateDOMProperties(oldProps, newProps); // 1.更新DOM自身属性
 		this._updateChildren(newProps.children); //! 2.更新子节点
@@ -140,8 +137,9 @@ class NativeUnit extends Unit {
 			if (!newProps.hasOwnProperty(propKey)) $ReactDOM.removeAttr(propKey);
 			// 删除所有的事件监听(取消委托,通过命名空间删除)
 			if (/^on[A-Za-z]/.test(propKey)) {
-				let eventType = propKey.replace("on", "");
-				$(document).undelegate(`[data-reactid="${this._reactId}"]`, eventType, oldProps[propKey]);
+				// let eventType = propKey.replace("on", "");
+				// $(document).undelegate(`[data-reactid="${this._reactId}"]`, eventType, oldProps[propKey]);
+				$(document).undelegate(`.${this._reactid}`);
 			}
 		}
 
@@ -156,7 +154,6 @@ class NativeUnit extends Unit {
 				const eventType = propKey.slice(2).toLowerCase();
 				// $(document).on(`${eventType}.${this._reactId}`, `[data-reactid="${this._reactId}"]`, newProps[propKey]);
 				$(document).delegate(`[data-reactid="${this._reactId}"]`, `${eventType}.${this._reactId}`, newProps[propKey]);
-				continue;
 				// 处理style
 			} else if (propKey === "style") {
 				for (const [attr, value] of Object.entries(newProps[propKey])) {
@@ -172,24 +169,25 @@ class NativeUnit extends Unit {
 	 */
 	_updateChildren(newChildrenElements) {
 		updateDepth++; // 更新diff层级
-		this._diff(newChildrenElements);
+		this._diff(diffQueue, newChildrenElements);
 		updateDepth--; // 更新diff层级
+
+		//! 当处理回最底层时,应用补丁包
 		if (updateDepth === 0 && diffQueue.length) {
-			// 当处理回最底层时,应用补丁包
 			this._patch(diffQueue); // 应用补丁包
 			diffQueue = []; // 清空补丁包
 		}
 	}
 
-	/** 递归找出差别,组装差异对象(inster/move/remove),添加到更新队列diffQueue。
+	/** 递归children找出差别,组装差异对象(inster/move/remove),添加到更新队列diffQueue。
 	 * @param {Array} newChildrenElements 新children集合
 	 */
-	_diff(newChildrenElements) {
+	_diff(diffQueue, newChildrenElements) {
 		const $ReactDOM = $(`[data-reactid="${this._reactId}"]`); // 记录父节点DOM对象
 		// 1. 构建oldChildrenUnit集合,用于判断新虚拟DOM能否继续使用旧元素的unit实例
 		const oldChildrenUnitMap = this.getChildrenUnitMap(this._renderedChildrenUnits);
 		// 2. 获取newChildren对应的Unit集合(尽量复用旧元素的unit),并更新DOM
-		const { newChildrenUnitAry, newChildrenUnitMap } = this.getNewChildrenUnits(oldChildrenUnitMap, newChildrenElements);
+		const { newChildrenUnitMap, newChildrenUnitAry } = this.getNewChildrenUnits(oldChildrenUnitMap, newChildrenElements);
 
 		//! 3. 记录上一个已经确定位置的索引.
 		let lastIndex = 0;
@@ -199,9 +197,9 @@ class NativeUnit extends Unit {
 			const newKey = (newUnit._currentElement.props && newUnit._currentElement.props.key) || i.toString();
 			const oldUnit = oldChildrenUnitMap[newKey];
 
+			//! 4.1 新unit在旧unit中存在,
 			if (oldUnit === newUnit) {
-				//! 4.1 新unit在旧unit中存在,对比位置看是否需要添加move补丁
-
+				// 对比位置看是否需要添加move补丁
 				if (oldUnit._mountIndex < lastIndex) {
 					// 4.1.1 如果挂载点索引小于lastIndex则向后位移到i(move补丁)
 					diffQueue.push({
@@ -233,7 +231,7 @@ class NativeUnit extends Unit {
 					type: types.INSERT,
 					parentId: this._reactId,
 					parentNode: $ReactDOM,
-					fromIndex: lastIndex,
+					// fromIndex: lastIndex,
 					toIndex: i,
 					getHtmlString: newUnit.getHtmlString(`${this._reactId}.${i}`),
 				});
@@ -283,7 +281,7 @@ class NativeUnit extends Unit {
 		const newChildrenUnitMap = {}; // 记录childrenUnitMap(保留原始key)
 		// 以新虚拟DomAry为基准,生成新虚拟dom的Ary & Map 集合 (尽量复用old虚拟DOM)
 		newChildrenElementAry.forEach((newElement, idx) => {
-			// 1. 获取新虚拟DOM的key
+			// 1. 获取新虚拟DOM的key,优先使用自身key,其次idx
 			const newKey = (newElement.props && newElement.props.key) || idx.toString();
 			// 2. 根据newKey尝试从老Unit集合中获取unit实例
 			const oldChildUnit = oldChildrenUnitMap[newKey];
@@ -305,8 +303,8 @@ class NativeUnit extends Unit {
 			}
 		});
 		return {
-			newChildrenUnitAry,
 			newChildrenUnitMap,
+			newChildrenUnitAry,
 		};
 	}
 
@@ -338,7 +336,7 @@ class NativeUnit extends Unit {
 			const difference = diffQueue[i];
 			switch (difference.type) {
 				case types.INSERT: // 2.1 创建新的DOM节点,并将其追加到children的指定索引位置
-					this.insertChildAt(difference.parentNode, difference.toIndex, difference.getHtmlString);
+					this.insertChildAt(difference.parentNode, difference.toIndex, $(difference.getHtmlString));
 					break;
 				case types.MOVE: // 2.2 从已删除集合中取出DOM元素,追加到新索引位置(二级结构)
 					const node = deleteMap[difference.parentId][difference.fromIndex];
@@ -406,8 +404,8 @@ class ComponsiteUnit extends Unit {
 
 		// 把要更新的state合并到this.state上
 		const nextState = { ...this._componentInstance.state, ...partialState };
-		const nextProps = this._currentElement.props; // 获取新 props.
 		this._componentInstance.state = nextState; // 更新state
+		const nextProps = this._currentElement.props; // 获取新 props.
 
 		const { shouldComponentUpdate, componentWillUpdate } = this._componentInstance;
 		// lifeCycle shouldComponentUpdate 组件是否进行更新
@@ -416,20 +414,20 @@ class ComponsiteUnit extends Unit {
 		componentWillUpdate && componentWillUpdate(nextProps, nextState);
 
 		//! 下面要进行比较更新
-		// 获取上次render返回的虚拟DOM
-		const prevRenderVirtualDOM = this._renderedUnitInstance._currentElement;
+		// 获取上次渲染的元素
+		const preRenderedElement = this._renderedUnitInstance._currentElement;
 		// 根据新state和新props获取新的虚拟DOM
-		const nextRenderVirtualDOM = this._componentInstance.render();
+		const nextRenderElement = this._componentInstance.render();
 		// 判断是否要对比更新还是重新渲染
-		if (shouldDeepCompare(prevRenderVirtualDOM, nextRenderVirtualDOM)) {
+		if (shouldDeepCompare(preRenderedElement, nextRenderElement)) {
 			// 自身不更新,交由render的unit实例对比更新,最终会由文本/原生DOM 的Unit进行diff-update
-			this._renderedUnitInstance.update(nextRenderVirtualDOM);
+			this._renderedUnitInstance.update(nextRenderElement);
 			// lifeCycle componentDidUpdate
 			this._componentInstance.componentDidUpdate && this._componentInstance.componentDidUpdate();
 		} else {
 			// 不需要对比(两种element),直接渲染替换
-			// 根据新虚拟DOM创建Unit实例,并更新this._renderedUnitInstance
-			this._renderedUnitInstance = createReactUnit(nextRenderVirtualDOM);
+			// 根据新Element创建Unit实例,并更新this._renderedUnitInstance
+			this._renderedUnitInstance = createReactUnit(nextRenderElement);
 			const newHtmlString = this._renderedUnitInstance.getHtmlString(this._reactId);
 			// 替换整个节点
 			$(`[data-reactid="${this._reactId}"]`).replaceWith(newHtmlString);

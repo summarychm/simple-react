@@ -46,6 +46,8 @@ module.exports = {
 		"no-param-reassign": 0,
 		"no-debugger": 0,
 		"import/no-unresolved": 0,
+		"linebreak-style": 0,
+		"function-paren-newline": 0,
 		"react/sort-comp": 0,
 		"react/destructuring-assignment": 0,
 		"react/no-access-state-in-setstate": 0,

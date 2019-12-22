@@ -1,4 +1,4 @@
-import React from "../Core/React";
+import React from "../Core/react";
 
 export default class Counter extends React.Component {
 	constructor(props) {
