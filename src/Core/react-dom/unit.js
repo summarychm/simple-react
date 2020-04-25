@@ -6,7 +6,7 @@
 // this._renderedUnitInstance 复合元素render返回值(虚拟DOM)对应的unit类实例
 
 import $ from "jquery";
-import { ReactElement } from "./element";
+import { ReactElement } from "../react/element";
 
 let diffQueue = []; // 差异队列(先比较,比较完成后才更新)
 let updateDepth = 0; //! 当前diff深度,当再次变为0时说明本次diff完成.

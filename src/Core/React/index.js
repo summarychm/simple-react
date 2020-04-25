@@ -7,7 +7,7 @@
   */
 
 import Component from "./component"; // ReactElement 父类
-import { createElement } from "../react-dom/element"; // 创建虚拟 DOM 实例
+import { createElement } from "./element"; // 创建虚拟 DOM 实例
 
 const React = {
 	createElement,
