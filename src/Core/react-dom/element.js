@@ -1,4 +1,4 @@
-// 虚拟 DOM类型定义,描述真实 DOM 节点
+// React元素(虚拟 DOM)类型定义,描述真实 DOM 节点
 class ReactElement {
 	constructor(type, props) {
 		this.type = type;
@@ -14,8 +14,7 @@ class ReactElement {
  */
 function createElement(type, props, ...children) {
 	props = props || {};
-	//  // 看有没有key，用来标识element的类型，方便以后高效的更新，这里可以先不管
-	//  let key = props.key || null;
+	// let key = props.key || null;
 	props.children = children || []; // children是props的一个属性
 	return new ReactElement(type, props);
 }
