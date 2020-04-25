@@ -21,6 +21,7 @@ module.exports = {
 	rules: {
 		"no-underscore-dangle": 0,
 		"max-classes-per-file": 0,
+		"object-curly-newline": 0,
 		"no-console": 0,
 		quotes: 0,
 		indent: 0,
